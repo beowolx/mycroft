@@ -1,0 +1,35 @@
+[package]
+name = "mycroft-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Command-line interface for mycroft"
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "mycroft"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.6.1", features = ["derive", "wrap_help"] }
+clap_complete = "4.6.5"
+console = "0.16.3"
+directories = "6.0.0"
+indicatif = "0.18.4"
+mycroft-core = { path = "../mycroft-core" }
+mycroft-manifest = { path = "../mycroft-manifest" }
+rlimit = "0.11.0"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros", "signal"] }
+toml = "1.1.2"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
+
+[dev-dependencies]
+assert_cmd = "2.2.2"
+predicates = "3.1.4"

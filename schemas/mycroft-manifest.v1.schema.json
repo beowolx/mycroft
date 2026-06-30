@@ -1,0 +1,893 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Manifest",
+  "type": "object",
+  "properties": {
+    "defaults": {
+      "$ref": "#/$defs/ManifestDefaults",
+      "default": {
+        "connect_timeout_ms": 4000,
+        "control_mode": "auto",
+        "decision_margin": 0.18000000715255737,
+        "max_body_bytes": 262144,
+        "min_hit_score": 0.7200000286102295,
+        "min_miss_score": 0.7200000286102295,
+        "redirect_policy": {
+          "max_hops": 5,
+          "mode": "follow"
+        },
+        "timeout_ms": 12000
+      }
+    },
+    "generated_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "manifest_id": {
+      "type": "string"
+    },
+    "manifest_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "schema": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sites": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Site"
+      }
+    }
+  },
+  "required": [
+    "manifest_version",
+    "manifest_id",
+    "sites"
+  ],
+  "$defs": {
+    "BlockClass": {
+      "type": "string",
+      "enum": [
+        "blocked",
+        "rate_limited",
+        "captcha",
+        "login_required",
+        "unsupported"
+      ]
+    },
+    "BlockSignal": {
+      "type": "object",
+      "properties": {
+        "case_insensitive": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "classify_as": {
+          "$ref": "#/$defs/BlockClass"
+        },
+        "header": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/SignalKind"
+        },
+        "match": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StatusMatch"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pattern": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "classify_as"
+      ]
+    },
+    "ControlMode": {
+      "type": "string",
+      "enum": [
+        "off",
+        "auto",
+        "strict"
+      ]
+    },
+    "ControlSpec": {
+      "type": "object",
+      "properties": {
+        "absent_username": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "DetectionSpec": {
+      "type": "object",
+      "properties": {
+        "block_signals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BlockSignal"
+          }
+        },
+        "control": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ControlSpec"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "decision_margin": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "float"
+        },
+        "min_hit_score": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "float"
+        },
+        "min_miss_score": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "float"
+        },
+        "signals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SignalSpec"
+          }
+        },
+        "status_gate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StatusGate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "signals"
+      ]
+    },
+    "EchoLocation": {
+      "type": "string",
+      "enum": [
+        "title",
+        "body",
+        "final_url",
+        "profile_url"
+      ]
+    },
+    "EvidenceOutcome": {
+      "type": "string",
+      "enum": [
+        "hit",
+        "miss",
+        "uncertain"
+      ]
+    },
+    "HttpMethod": {
+      "type": "string",
+      "enum": [
+        "GET",
+        "HEAD",
+        "POST",
+        "PUT"
+      ]
+    },
+    "KnownControls": {
+      "type": "object",
+      "properties": {
+        "absent": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "claimed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ManifestDefaults": {
+      "type": "object",
+      "properties": {
+        "block_signals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BlockSignal"
+          }
+        },
+        "connect_timeout_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "default": 4000,
+          "minimum": 0
+        },
+        "control_mode": {
+          "$ref": "#/$defs/ControlMode",
+          "default": "auto"
+        },
+        "decision_margin": {
+          "type": "number",
+          "format": "float",
+          "default": 0.18000000715255737
+        },
+        "max_body_bytes": {
+          "type": "integer",
+          "format": "uint",
+          "default": 262144,
+          "minimum": 0
+        },
+        "min_hit_score": {
+          "type": "number",
+          "format": "float",
+          "default": 0.7200000286102295
+        },
+        "min_miss_score": {
+          "type": "number",
+          "format": "float",
+          "default": 0.7200000286102295
+        },
+        "redirect_policy": {
+          "$ref": "#/$defs/RedirectPolicy",
+          "default": {
+            "max_hops": 5,
+            "mode": "follow"
+          }
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "default": 12000,
+          "minimum": 0
+        },
+        "user_agent": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "MatchOp": {
+      "type": "string",
+      "enum": [
+        "exists",
+        "equals",
+        "not_equals",
+        "contains",
+        "regex",
+        "equals_username",
+        "contains_username"
+      ]
+    },
+    "RedirectMode": {
+      "type": "string",
+      "enum": [
+        "follow",
+        "manual"
+      ]
+    },
+    "RedirectPolicy": {
+      "type": "object",
+      "properties": {
+        "max_hops": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "mode": {
+          "$ref": "#/$defs/RedirectMode"
+        }
+      },
+      "required": [
+        "mode",
+        "max_hops"
+      ]
+    },
+    "RequestSpec": {
+      "type": "object",
+      "properties": {
+        "body_template": true,
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "idempotent": {
+          "type": "boolean",
+          "default": true
+        },
+        "max_body_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "method": {
+          "$ref": "#/$defs/HttpMethod"
+        },
+        "redirect_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RedirectPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "timeout_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "url_template": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "method"
+      ]
+    },
+    "RiskInfo": {
+      "type": "object",
+      "properties": {
+        "notes": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "requires_control": {
+          "type": "boolean"
+        }
+      }
+    },
+    "SignalKind": {
+      "type": "string",
+      "enum": [
+        "status",
+        "header",
+        "redirect",
+        "body_substring",
+        "body_regex",
+        "html_title",
+        "css_selector",
+        "json_path",
+        "canonical_url",
+        "username_echo",
+        "body_similarity",
+        "body_size"
+      ]
+    },
+    "SignalSpec": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "outcome": {
+          "$ref": "#/$defs/EvidenceOutcome"
+        },
+        "weight": {
+          "type": "number",
+          "format": "float"
+        }
+      },
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "status"
+            },
+            "match": {
+              "$ref": "#/$defs/StatusMatch"
+            }
+          },
+          "required": [
+            "kind",
+            "match"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "header": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "header"
+            },
+            "op": {
+              "$ref": "#/$defs/MatchOp"
+            },
+            "pattern": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "value": true
+          },
+          "required": [
+            "kind",
+            "header",
+            "op"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "redirect"
+            },
+            "op": {
+              "$ref": "#/$defs/MatchOp"
+            },
+            "pattern": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "value": true
+          },
+          "required": [
+            "kind",
+            "op"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "case_insensitive": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "body_substring"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "body_regex"
+            },
+            "pattern": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "pattern"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "html_title"
+            },
+            "op": {
+              "$ref": "#/$defs/MatchOp"
+            },
+            "pattern": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "value": true
+          },
+          "required": [
+            "kind",
+            "op"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "attr": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "css_selector"
+            },
+            "op": {
+              "$ref": "#/$defs/MatchOp"
+            },
+            "pattern": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "selector": {
+              "type": "string"
+            },
+            "value": true
+          },
+          "required": [
+            "kind",
+            "selector",
+            "op"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "json_path"
+            },
+            "op": {
+              "$ref": "#/$defs/MatchOp"
+            },
+            "path": {
+              "type": "string"
+            },
+            "pattern": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "value": true
+          },
+          "required": [
+            "kind",
+            "path",
+            "op"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "canonical_url"
+            },
+            "pattern": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "selector": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "username_echo"
+            },
+            "location": {
+              "$ref": "#/$defs/EchoLocation"
+            }
+          },
+          "required": [
+            "kind",
+            "location"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "direction": {
+              "$ref": "#/$defs/SimilarityDirection"
+            },
+            "kind": {
+              "type": "string",
+              "const": "body_similarity"
+            },
+            "similarity_threshold": {
+              "type": "number",
+              "format": "float"
+            }
+          },
+          "required": [
+            "kind",
+            "similarity_threshold",
+            "direction"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "body_size"
+            },
+            "range": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "uint",
+                "minimum": 0
+              },
+              "maxItems": 2,
+              "minItems": 2
+            }
+          },
+          "required": [
+            "kind",
+            "range"
+          ]
+        }
+      ],
+      "required": [
+        "id",
+        "outcome",
+        "weight"
+      ]
+    },
+    "SimilarityDirection": {
+      "type": "string",
+      "enum": [
+        "similar_to_control",
+        "different_from_control"
+      ]
+    },
+    "Site": {
+      "type": "object",
+      "properties": {
+        "detection": {
+          "$ref": "#/$defs/DetectionSpec"
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "id": {
+          "type": "string"
+        },
+        "known_controls": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/KnownControls"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "nsfw": {
+          "type": "boolean"
+        },
+        "profile_url_template": {
+          "type": "string"
+        },
+        "request": {
+          "$ref": "#/$defs/RequestSpec",
+          "default": {
+            "idempotent": true,
+            "method": "GET"
+          }
+        },
+        "risk": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RiskInfo"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "url_main": {
+          "type": "string"
+        },
+        "username": {
+          "$ref": "#/$defs/UsernameRules",
+          "default": {
+            "case": "preserve",
+            "encode": "space_only"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "url_main",
+        "profile_url_template",
+        "detection"
+      ]
+    },
+    "StatusGate": {
+      "type": "object",
+      "properties": {
+        "body_signals_allowed_status": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint16",
+            "maximum": 65535,
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "StatusMatch": {
+      "type": "object",
+      "properties": {
+        "codes": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint16",
+            "maximum": 65535,
+            "minimum": 0
+          }
+        },
+        "exclude_codes": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint16",
+            "maximum": 65535,
+            "minimum": 0
+          }
+        },
+        "negate": {
+          "type": "boolean"
+        },
+        "ranges": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0
+            },
+            "maxItems": 2,
+            "minItems": 2
+          }
+        }
+      }
+    },
+    "UsernameCase": {
+      "type": "string",
+      "enum": [
+        "preserve",
+        "lower",
+        "upper"
+      ]
+    },
+    "UsernameEncoding": {
+      "type": "string",
+      "enum": [
+        "space_only",
+        "percent_path",
+        "none"
+      ]
+    },
+    "UsernameRules": {
+      "type": "object",
+      "properties": {
+        "absent_template": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "case": {
+          "$ref": "#/$defs/UsernameCase",
+          "default": "preserve"
+        },
+        "encode": {
+          "$ref": "#/$defs/UsernameEncoding",
+          "default": "space_only"
+        },
+        "regex": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

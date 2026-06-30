@@ -1,0 +1,35 @@
+[workspace]
+resolver = "3"
+members = [
+  "crates/mycroft-manifest",
+  "crates/mycroft-core",
+  "crates/mycroft-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+repository = "https://github.com/beowolx/mycroft"
+authors = ["mycroft contributors"]
+description = "A fast, accuracy-focused OSINT username enumeration CLI and library"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+opt-level = 3
+panic = "abort"
+debug-assertions = false
+overflow-checks = false
+strip = true
+
+[profile.release.build-override]
+opt-level = 3
