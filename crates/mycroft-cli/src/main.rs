@@ -394,10 +394,11 @@ fn gather_emails(raw: &[String]) -> Result<Vec<mycroft_core::Username>, Exit> {
       eprintln!("error: invalid email '{value}': {e}");
       Exit::Usage
     })?;
-    let subject = mycroft_core::Username::parse(email.as_str()).map_err(|e| {
-      eprintln!("error: invalid email '{value}': {e}");
-      Exit::Usage
-    })?;
+    let subject =
+      mycroft_core::Username::parse(email.as_str()).map_err(|e| {
+        eprintln!("error: invalid email '{value}': {e}");
+        Exit::Usage
+      })?;
     emails.push(subject);
   }
   Ok(emails)

@@ -330,8 +330,10 @@ impl GithubClient {
       self.fetch_organizations(username).await,
       Vec::new(),
     );
-    report.organizations =
-      organizations.into_iter().map(GithubOrganization::from).collect();
+    report.organizations = organizations
+      .into_iter()
+      .map(GithubOrganization::from)
+      .collect();
 
     report.ssh_keys = report.record(
       "ssh_keys",
@@ -339,11 +341,8 @@ impl GithubClient {
       Vec::new(),
     );
 
-    report.friends = report.record(
-      "friends",
-      self.fetch_friends(username).await,
-      Vec::new(),
-    );
+    report.friends =
+      report.record("friends", self.fetch_friends(username).await, Vec::new());
 
     report.similar_users = report.record(
       "similar_users",

@@ -107,7 +107,8 @@ pub fn finalize_main(
   }
 
   let body = main.body.as_ref().map(|bytes| {
-    template::interpolate_vars(&String::from_utf8_lossy(bytes), vars).into_bytes()
+    template::interpolate_vars(&String::from_utf8_lossy(bytes), vars)
+      .into_bytes()
   });
 
   Ok(PreparedRequest {
