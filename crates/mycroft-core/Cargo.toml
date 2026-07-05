@@ -15,8 +15,10 @@ workspace = true
 async-trait = "0.1.89"
 fancy-regex = "0.18.0"
 governor = "0.10.4"
+md-5 = "0.10.6"
 mycroft-manifest = { version = "0.1.0", path = "../mycroft-manifest" }
 percent-encoding = "2.3.2"
+sha2 = "0.10.9"
 rand = "0.10.1"
 regex = "1.12.4"
 reqwest = { version = "0.13.4", default-features = false, features = ["native-tls", "gzip", "brotli", "deflate", "socks", "stream", "json", "charset", "http2"] }
@@ -28,7 +30,6 @@ thiserror = "2.0.18"
 time = { version = "0.3.45", features = ["serde", "formatting", "parsing", "macros"] }
 tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros", "sync", "time", "signal", "io-util"] }
 tokio-util = "0.7.18"
-tracing = "0.1.44"
 url = { version = "2.5.8", features = ["serde"] }
 
 [dev-dependencies]

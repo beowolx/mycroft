@@ -143,8 +143,10 @@ async fn run(
 ) -> ScanReport {
   let input = ScanInput {
     usernames: vec![Username::parse("alice").expect("valid username")],
+    subject_kind: mycroft_core::SubjectKind::Username,
     site_selection: SiteSelection::default(),
     include_nsfw: false,
+    include_email_sending: false,
   };
   scan_with_executor(
     input,

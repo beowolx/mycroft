@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
 
-use mycroft_manifest::{Manifest, Site};
+use mycroft_manifest::{Manifest, Site, SubjectKind};
 
 use crate::config::RuntimeConfig;
 use crate::detect::Detector;
@@ -25,8 +25,10 @@ pub struct SiteSelection {
 #[derive(Clone, Debug)]
 pub struct ScanInput {
   pub usernames: Vec<Username>,
+  pub subject_kind: SubjectKind,
   pub site_selection: SiteSelection,
   pub include_nsfw: bool,
+  pub include_email_sending: bool,
 }
 
 impl ScanInput {
@@ -35,7 +37,13 @@ impl ScanInput {
     if !site.enabled {
       return false;
     }
+    if !site.supports_kind(self.subject_kind) {
+      return false;
+    }
     if site.nsfw && !self.include_nsfw {
+      return false;
+    }
+    if site.sends_email && !self.include_email_sending {
       return false;
     }
     let sel = &self.site_selection;

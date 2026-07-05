@@ -31025,6 +31025,674 @@
           "janusz-nowak"
         ]
       }
+    },
+    {
+      "id": "spotify_email",
+      "name": "Spotify (email)",
+      "url_main": "https://www.spotify.com/",
+      "enabled": true,
+      "supports": [
+        "email"
+      ],
+      "tags": [
+        "email",
+        "account-existence"
+      ],
+      "username": {
+        "case": "preserve",
+        "encode": "none"
+      },
+      "profile_url_template": "https://www.spotify.com/signup",
+      "request": {
+        "method": "GET",
+        "url_template": "https://spclient.wg.spotify.com/signup/public/v1/account?validate=1&email={email}",
+        "headers": {
+          "Accept": "application/json"
+        },
+        "idempotent": true
+      },
+      "detection": {
+        "status_gate": {
+          "body_signals_allowed_status": [
+            200
+          ]
+        },
+        "signals": [
+          {
+            "id": "email_registered",
+            "outcome": "hit",
+            "weight": 0.97,
+            "kind": "json_path",
+            "path": "$.status",
+            "op": "equals",
+            "value": 20
+          },
+          {
+            "id": "email_available",
+            "outcome": "miss",
+            "weight": 0.97,
+            "kind": "json_path",
+            "path": "$.status",
+            "op": "equals",
+            "value": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "gravatar_email",
+      "name": "Gravatar (email)",
+      "url_main": "https://gravatar.com/",
+      "enabled": true,
+      "supports": [
+        "email"
+      ],
+      "tags": [
+        "email",
+        "account-existence",
+        "avatar"
+      ],
+      "username": {
+        "case": "preserve",
+        "encode": "none"
+      },
+      "profile_url_template": "https://gravatar.com/{email_sha256}",
+      "request": {
+        "method": "GET",
+        "url_template": "https://api.gravatar.com/v3/profiles/{email_sha256}",
+        "headers": {
+          "Accept": "application/json"
+        },
+        "idempotent": true
+      },
+      "detection": {
+        "signals": [
+          {
+            "id": "profile_exists",
+            "outcome": "hit",
+            "weight": 0.95,
+            "kind": "status",
+            "match": {
+              "codes": [
+                200
+              ]
+            }
+          },
+          {
+            "id": "no_profile",
+            "outcome": "miss",
+            "weight": 0.95,
+            "kind": "status",
+            "match": {
+              "codes": [
+                404
+              ]
+            }
+          }
+        ],
+        "block_signals": [
+          {
+            "id": "rate_limited",
+            "kind": "status",
+            "match": {
+              "codes": [
+                429
+              ]
+            },
+            "classify_as": "rate_limited"
+          }
+        ]
+      }
+    },
+    {
+      "id": "mozilla_accounts_email",
+      "name": "Mozilla Accounts (email)",
+      "url_main": "https://accounts.firefox.com/",
+      "enabled": true,
+      "supports": [
+        "email"
+      ],
+      "tags": [
+        "email",
+        "account-existence"
+      ],
+      "username": {
+        "case": "preserve",
+        "encode": "none"
+      },
+      "profile_url_template": "https://accounts.firefox.com/",
+      "request": {
+        "method": "POST",
+        "url_template": "https://api.accounts.firefox.com/v1/account/status",
+        "headers": {
+          "Accept": "application/json"
+        },
+        "body_template": {
+          "email": "{email}"
+        },
+        "idempotent": true
+      },
+      "detection": {
+        "status_gate": {
+          "body_signals_allowed_status": [
+            200
+          ]
+        },
+        "signals": [
+          {
+            "id": "account_exists",
+            "outcome": "hit",
+            "weight": 0.95,
+            "kind": "json_path",
+            "path": "$.exists",
+            "op": "equals",
+            "value": true
+          },
+          {
+            "id": "account_absent",
+            "outcome": "miss",
+            "weight": 0.95,
+            "kind": "json_path",
+            "path": "$.exists",
+            "op": "equals",
+            "value": false
+          }
+        ],
+        "block_signals": [
+          {
+            "id": "rate_limited",
+            "kind": "status",
+            "match": {
+              "codes": [
+                429
+              ]
+            },
+            "classify_as": "rate_limited"
+          }
+        ]
+      }
+    },
+    {
+      "id": "duolingo_email",
+      "name": "Duolingo (email)",
+      "url_main": "https://www.duolingo.com/",
+      "enabled": true,
+      "supports": [
+        "email"
+      ],
+      "tags": [
+        "email",
+        "account-existence"
+      ],
+      "username": {
+        "case": "preserve",
+        "encode": "none"
+      },
+      "profile_url_template": "https://www.duolingo.com/",
+      "request": {
+        "method": "GET",
+        "url_template": "https://www.duolingo.com/2017-06-30/users?email={email}",
+        "headers": {
+          "Accept": "application/json"
+        },
+        "idempotent": true
+      },
+      "detection": {
+        "status_gate": {
+          "body_signals_allowed_status": [
+            200
+          ]
+        },
+        "signals": [
+          {
+            "id": "account_exists",
+            "outcome": "hit",
+            "weight": 0.9,
+            "kind": "json_path",
+            "path": "$.users[0]",
+            "op": "exists"
+          },
+          {
+            "id": "account_absent",
+            "outcome": "miss",
+            "weight": 0.9,
+            "kind": "body_substring",
+            "value": "\"users\":[]"
+          }
+        ]
+      }
+    },
+    {
+      "id": "twitter_email",
+      "name": "Twitter / X (email)",
+      "url_main": "https://twitter.com/",
+      "enabled": true,
+      "supports": [
+        "email"
+      ],
+      "tags": [
+        "email",
+        "account-existence",
+        "social"
+      ],
+      "username": {
+        "case": "preserve",
+        "encode": "none"
+      },
+      "profile_url_template": "https://twitter.com/",
+      "request": {
+        "method": "GET",
+        "url_template": "https://api.twitter.com/i/users/email_available.json?email={email}",
+        "headers": {
+          "Accept": "application/json"
+        },
+        "idempotent": true
+      },
+      "detection": {
+        "status_gate": {
+          "body_signals_allowed_status": [
+            200
+          ]
+        },
+        "signals": [
+          {
+            "id": "email_taken",
+            "outcome": "hit",
+            "weight": 0.95,
+            "kind": "json_path",
+            "path": "$.taken",
+            "op": "equals",
+            "value": true
+          },
+          {
+            "id": "email_available",
+            "outcome": "miss",
+            "weight": 0.95,
+            "kind": "json_path",
+            "path": "$.taken",
+            "op": "equals",
+            "value": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "adobe_email",
+      "name": "Adobe (email)",
+      "url_main": "https://www.adobe.com/",
+      "enabled": true,
+      "supports": [
+        "email"
+      ],
+      "tags": [
+        "email",
+        "account-existence"
+      ],
+      "username": {
+        "case": "preserve",
+        "encode": "none"
+      },
+      "profile_url_template": "https://account.adobe.com/",
+      "request": {
+        "method": "POST",
+        "url_template": "https://auth.services.adobe.com/signin/v2/users/accounts",
+        "headers": {
+          "Accept": "application/json",
+          "x-ims-clientid": "adobedotcom2"
+        },
+        "body_template": {
+          "username": "{email}"
+        },
+        "idempotent": true
+      },
+      "detection": {
+        "status_gate": {
+          "body_signals_allowed_status": [
+            200
+          ]
+        },
+        "signals": [
+          {
+            "id": "account_exists",
+            "outcome": "hit",
+            "weight": 0.95,
+            "kind": "json_path",
+            "path": "$[0]",
+            "op": "exists"
+          },
+          {
+            "id": "no_account",
+            "outcome": "miss",
+            "weight": 0.95,
+            "kind": "body_regex",
+            "pattern": "^\\s*\\[\\s*\\]\\s*$"
+          }
+        ]
+      }
+    },
+    {
+      "id": "mail_ru_email",
+      "name": "Mail.ru (email)",
+      "url_main": "https://mail.ru/",
+      "enabled": true,
+      "supports": [
+        "email"
+      ],
+      "sends_email": true,
+      "tags": [
+        "email",
+        "account-existence",
+        "account-recovery"
+      ],
+      "risk": {
+        "notes": "initiates account recovery; sends a recovery email or SMS to the owner if the address is registered"
+      },
+      "username": {
+        "case": "preserve",
+        "encode": "none"
+      },
+      "profile_url_template": "https://account.mail.ru/",
+      "request": {
+        "method": "POST",
+        "url_template": "https://account.mail.ru/api/v1/user/password/restore",
+        "headers": {
+          "Accept": "application/json, text/javascript, */*; q=0.01",
+          "X-Requested-With": "XMLHttpRequest",
+          "Origin": "https://account.mail.ru"
+        },
+        "body_form": {
+          "email": "{email}",
+          "htmlencoded": "false"
+        },
+        "idempotent": false
+      },
+      "detection": {
+        "status_gate": {
+          "body_signals_allowed_status": [
+            200
+          ]
+        },
+        "signals": [
+          {
+            "id": "account_exists",
+            "outcome": "hit",
+            "weight": 0.9,
+            "kind": "json_path",
+            "path": "$.status",
+            "op": "equals",
+            "value": 200
+          },
+          {
+            "id": "account_absent",
+            "outcome": "miss",
+            "weight": 0.9,
+            "kind": "json_path",
+            "path": "$.body.email.error",
+            "op": "equals",
+            "value": "not_exists"
+          }
+        ]
+      }
+    },
+    {
+      "id": "xvideos_email",
+      "name": "XVideos (email)",
+      "url_main": "https://www.xvideos.com/",
+      "enabled": true,
+      "supports": [
+        "email"
+      ],
+      "nsfw": true,
+      "tags": [
+        "email",
+        "account-existence",
+        "adult"
+      ],
+      "username": {
+        "case": "preserve",
+        "encode": "none"
+      },
+      "profile_url_template": "https://www.xvideos.com/",
+      "request": {
+        "method": "GET",
+        "url_template": "https://www.xvideos.com/account/checkemail?email={email}",
+        "headers": {
+          "Accept": "application/json, text/javascript, */*; q=0.01",
+          "X-Requested-With": "XMLHttpRequest",
+          "Referer": "https://www.xvideos.com/"
+        },
+        "idempotent": true
+      },
+      "detection": {
+        "status_gate": {
+          "body_signals_allowed_status": [
+            200
+          ]
+        },
+        "signals": [
+          {
+            "id": "email_taken",
+            "outcome": "hit",
+            "weight": 0.85,
+            "kind": "json_path",
+            "path": "$.code",
+            "op": "equals",
+            "value": 1
+          },
+          {
+            "id": "email_available",
+            "outcome": "miss",
+            "weight": 0.9,
+            "kind": "json_path",
+            "path": "$.code",
+            "op": "equals",
+            "value": 0
+          }
+        ],
+        "block_signals": [
+          {
+            "id": "too_fast",
+            "kind": "body_substring",
+            "value": "\"code\":2",
+            "classify_as": "rate_limited"
+          }
+        ]
+      }
+    },
+    {
+      "id": "xnxx_email",
+      "name": "XNXX (email)",
+      "url_main": "https://www.xnxx.com/",
+      "enabled": true,
+      "supports": [
+        "email"
+      ],
+      "nsfw": true,
+      "tags": [
+        "email",
+        "account-existence",
+        "adult"
+      ],
+      "username": {
+        "case": "preserve",
+        "encode": "none"
+      },
+      "profile_url_template": "https://www.xnxx.com/",
+      "request": {
+        "method": "GET",
+        "url_template": "https://www.xnxx.com/account/checkemail?email={email}",
+        "headers": {
+          "Accept": "application/json, text/javascript, */*; q=0.01",
+          "X-Requested-With": "XMLHttpRequest",
+          "Referer": "https://www.xnxx.com/"
+        },
+        "idempotent": true
+      },
+      "detection": {
+        "status_gate": {
+          "body_signals_allowed_status": [
+            200
+          ]
+        },
+        "signals": [
+          {
+            "id": "email_taken",
+            "outcome": "hit",
+            "weight": 0.85,
+            "kind": "json_path",
+            "path": "$.code",
+            "op": "equals",
+            "value": 1
+          },
+          {
+            "id": "email_available",
+            "outcome": "miss",
+            "weight": 0.9,
+            "kind": "json_path",
+            "path": "$.code",
+            "op": "equals",
+            "value": 0
+          }
+        ],
+        "block_signals": [
+          {
+            "id": "too_fast",
+            "kind": "body_substring",
+            "value": "\"code\":2",
+            "classify_as": "rate_limited"
+          }
+        ]
+      }
+    },
+    {
+      "id": "plurk_email",
+      "name": "Plurk (email)",
+      "url_main": "https://www.plurk.com/",
+      "enabled": true,
+      "supports": [
+        "email"
+      ],
+      "tags": [
+        "email",
+        "account-existence",
+        "social"
+      ],
+      "username": {
+        "case": "preserve",
+        "encode": "none"
+      },
+      "profile_url_template": "https://www.plurk.com/",
+      "request": {
+        "method": "POST",
+        "url_template": "https://www.plurk.com/Users/isEmailFound",
+        "headers": {
+          "Origin": "https://www.plurk.com",
+          "Referer": "https://www.plurk.com/"
+        },
+        "body_form": {
+          "email": "{email}"
+        },
+        "idempotent": true
+      },
+      "detection": {
+        "status_gate": {
+          "body_signals_allowed_status": [
+            200
+          ]
+        },
+        "signals": [
+          {
+            "id": "account_exists",
+            "outcome": "hit",
+            "weight": 0.9,
+            "kind": "body_substring",
+            "value": "True"
+          },
+          {
+            "id": "account_absent",
+            "outcome": "miss",
+            "weight": 0.9,
+            "kind": "body_substring",
+            "value": "False"
+          }
+        ]
+      }
+    },
+    {
+      "id": "tumblr_email",
+      "name": "Tumblr (email)",
+      "url_main": "https://www.tumblr.com/",
+      "enabled": true,
+      "supports": [
+        "email"
+      ],
+      "tags": [
+        "email",
+        "account-existence",
+        "social"
+      ],
+      "username": {
+        "case": "preserve",
+        "encode": "none"
+      },
+      "profile_url_template": "https://www.tumblr.com/",
+      "prerequest": {
+        "method": "GET",
+        "url_template": "https://www.tumblr.com/register",
+        "headers": {
+          "Accept": "text/html"
+        },
+        "forward_cookies": false,
+        "extract": [
+          {
+            "name": "token",
+            "source": "regex",
+            "pattern": "\"API_TOKEN\":\"([^\"]+)\""
+          }
+        ]
+      },
+      "request": {
+        "method": "POST",
+        "url_template": "https://www.tumblr.com/api/v2/register/account/validate",
+        "headers": {
+          "Authorization": "Bearer {var:token}",
+          "Accept": "application/json"
+        },
+        "body_template": {
+          "email": "{email}",
+          "tumblelog": "mycroftprobexq7unused",
+          "password": "correcthorsebatterystaple"
+        },
+        "idempotent": true
+      },
+      "detection": {
+        "status_gate": {
+          "body_signals_allowed_status": [
+            200,
+            400
+          ]
+        },
+        "signals": [
+          {
+            "id": "account_exists",
+            "outcome": "hit",
+            "weight": 0.9,
+            "kind": "json_path",
+            "path": "$.response.code",
+            "op": "equals",
+            "value": 2
+          },
+          {
+            "id": "account_absent",
+            "outcome": "miss",
+            "weight": 0.85,
+            "kind": "json_path",
+            "path": "$.meta.status",
+            "op": "equals",
+            "value": 200
+          }
+        ]
+      }
     }
   ]
 }

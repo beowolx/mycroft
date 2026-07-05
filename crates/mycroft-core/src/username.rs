@@ -209,7 +209,7 @@ fn pick<R: rand::Rng + ?Sized>(rng: &mut R, n: usize) -> usize {
   usize::from(byte[0]) % n.max(1)
 }
 
-fn random_alnum_starting_with_letter<R: rand::Rng + ?Sized>(
+pub(crate) fn random_alnum_starting_with_letter<R: rand::Rng + ?Sized>(
   rng: &mut R,
   len: usize,
 ) -> String {

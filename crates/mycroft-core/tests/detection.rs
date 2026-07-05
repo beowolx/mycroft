@@ -237,3 +237,165 @@ fn global_waf_body_on_non_2xx_still_blocks() {
   let body = "<html>...window.perimeterxIdentifiers...</html>";
   assert_eq!(verdict(&m, &response(403, body)), Verdict::Blocked);
 }
+
+const EMAIL_STATUS_SITE: &str = r#"{
+  "status_gate": {"body_signals_allowed_status": [200]},
+  "signals": [
+    {"id":"email_registered","outcome":"hit","weight":0.97,"kind":"json_path","path":"$.status","op":"equals","value":20},
+    {"id":"email_available","outcome":"miss","weight":0.97,"kind":"json_path","path":"$.status","op":"equals","value":1}
+  ]
+}"#;
+
+#[test]
+fn email_account_registered_status_is_found() {
+  let m = manifest(EMAIL_STATUS_SITE);
+  let body = r#"{"status":20,"errors":{"email":"already registered"}}"#;
+  assert_eq!(verdict(&m, &response(200, body)), Verdict::Found);
+}
+
+#[test]
+fn email_account_available_status_is_not_found() {
+  let m = manifest(EMAIL_STATUS_SITE);
+  assert_eq!(
+    verdict(&m, &response(200, r#"{"status":1}"#)),
+    Verdict::NotFound
+  );
+}
+
+const EMAIL_STATUS_CODE_SITE: &str = r#"{
+  "signals": [
+    {"id":"profile_exists","outcome":"hit","weight":0.95,"kind":"status","match":{"codes":[200]}},
+    {"id":"no_profile","outcome":"miss","weight":0.95,"kind":"status","match":{"codes":[404]}}
+  ]
+}"#;
+
+#[test]
+fn gravatar_style_200_is_found_404_is_not_found() {
+  let m = manifest(EMAIL_STATUS_CODE_SITE);
+  assert_eq!(verdict(&m, &response(200, "{}")), Verdict::Found);
+  assert_eq!(verdict(&m, &response(404, "")), Verdict::NotFound);
+}
+
+const EMAIL_USERS_ARRAY_SITE: &str = r#"{
+  "status_gate": {"body_signals_allowed_status": [200]},
+  "signals": [
+    {"id":"account_exists","outcome":"hit","weight":0.9,"kind":"json_path","path":"$.users[0]","op":"exists"},
+    {"id":"account_absent","outcome":"miss","weight":0.9,"kind":"body_substring","value":"\"users\":[]"}
+  ]
+}"#;
+
+#[test]
+fn duolingo_style_populated_array_is_found() {
+  let m = manifest(EMAIL_USERS_ARRAY_SITE);
+  let body = r#"{"users":[{"id":0,"username":""}]}"#;
+  assert_eq!(verdict(&m, &response(200, body)), Verdict::Found);
+}
+
+#[test]
+fn duolingo_style_empty_array_is_not_found() {
+  let m = manifest(EMAIL_USERS_ARRAY_SITE);
+  assert_eq!(
+    verdict(&m, &response(200, r#"{"users":[]}"#)),
+    Verdict::NotFound
+  );
+}
+
+const EMAIL_BOOL_SITE: &str = r#"{
+  "status_gate": {"body_signals_allowed_status": [200]},
+  "signals": [
+    {"id":"email_taken","outcome":"hit","weight":0.95,"kind":"json_path","path":"$.taken","op":"equals","value":true},
+    {"id":"email_available","outcome":"miss","weight":0.95,"kind":"json_path","path":"$.taken","op":"equals","value":false}
+  ]
+}"#;
+
+#[test]
+fn twitter_style_taken_bool_is_found_or_not_found() {
+  let m = manifest(EMAIL_BOOL_SITE);
+  assert_eq!(
+    verdict(&m, &response(200, r#"{"taken":true}"#)),
+    Verdict::Found
+  );
+  assert_eq!(
+    verdict(&m, &response(200, r#"{"taken":false}"#)),
+    Verdict::NotFound
+  );
+}
+
+const EMAIL_ROOT_ARRAY_SITE: &str = r#"{
+  "status_gate": {"body_signals_allowed_status": [200]},
+  "signals": [
+    {"id":"account_exists","outcome":"hit","weight":0.95,"kind":"json_path","path":"$[0]","op":"exists"},
+    {"id":"no_account","outcome":"miss","weight":0.95,"kind":"body_regex","pattern":"^\\s*\\[\\s*\\]\\s*$"}
+  ]
+}"#;
+
+#[test]
+fn adobe_style_populated_root_array_is_found() {
+  let m = manifest(EMAIL_ROOT_ARRAY_SITE);
+  let body = r#"[{"type":"individual","authenticationMethods":[]}]"#;
+  assert_eq!(verdict(&m, &response(200, body)), Verdict::Found);
+}
+
+#[test]
+fn adobe_style_empty_root_array_is_not_found() {
+  let m = manifest(EMAIL_ROOT_ARRAY_SITE);
+  assert_eq!(verdict(&m, &response(200, "[]")), Verdict::NotFound);
+}
+
+const EMAIL_RECOVERY_SITE: &str = r#"{
+  "status_gate": {"body_signals_allowed_status": [200]},
+  "signals": [
+    {"id":"account_exists","outcome":"hit","weight":0.9,"kind":"json_path","path":"$.status","op":"equals","value":200},
+    {"id":"account_absent","outcome":"miss","weight":0.9,"kind":"json_path","path":"$.body.email.error","op":"equals","value":"not_exists"}
+  ]
+}"#;
+
+#[test]
+fn mailru_style_recovery_status_200_is_found() {
+  let m = manifest(EMAIL_RECOVERY_SITE);
+  let body = r#"{"status":200,"body":{"emails":["a***@mail.ru"]}}"#;
+  assert_eq!(verdict(&m, &response(200, body)), Verdict::Found);
+}
+
+#[test]
+fn mailru_style_not_exists_is_not_found() {
+  let m = manifest(EMAIL_RECOVERY_SITE);
+  let body = r#"{"status":400,"body":{"email":{"error":"not_exists"}}}"#;
+  assert_eq!(verdict(&m, &response(200, body)), Verdict::NotFound);
+}
+
+const EMAIL_CODE_SITE: &str = r#"{
+  "status_gate": {"body_signals_allowed_status": [200]},
+  "signals": [
+    {"id":"email_taken","outcome":"hit","weight":0.85,"kind":"json_path","path":"$.code","op":"equals","value":1},
+    {"id":"email_available","outcome":"miss","weight":0.9,"kind":"json_path","path":"$.code","op":"equals","value":0}
+  ]
+}"#;
+
+#[test]
+fn xvideos_style_code_1_is_found_code_0_is_not_found() {
+  let m = manifest(EMAIL_CODE_SITE);
+  assert_eq!(
+    verdict(&m, &response(200, r#"{"result":false,"code":1}"#)),
+    Verdict::Found
+  );
+  assert_eq!(
+    verdict(&m, &response(200, r#"{"result":true,"code":0}"#)),
+    Verdict::NotFound
+  );
+}
+
+const EMAIL_TRUEFALSE_SITE: &str = r#"{
+  "status_gate": {"body_signals_allowed_status": [200]},
+  "signals": [
+    {"id":"account_exists","outcome":"hit","weight":0.9,"kind":"body_substring","value":"True"},
+    {"id":"account_absent","outcome":"miss","weight":0.9,"kind":"body_substring","value":"False"}
+  ]
+}"#;
+
+#[test]
+fn plurk_style_true_is_found_false_is_not_found() {
+  let m = manifest(EMAIL_TRUEFALSE_SITE);
+  assert_eq!(verdict(&m, &response(200, "True")), Verdict::Found);
+  assert_eq!(verdict(&m, &response(200, "False")), Verdict::NotFound);
+}

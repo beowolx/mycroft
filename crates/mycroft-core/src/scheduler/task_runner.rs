@@ -64,7 +64,7 @@ pub async fn run_task(
   }
 
   host.rate_limit().await;
-  let primary = match run_probe(&task.prepared.request, &deps, &task).await {
+  let primary = match run_primary(&task, &deps, &host).await {
     Ok(response) => response,
     Err(error) => {
       if let Some(until_ms) =
@@ -183,6 +183,29 @@ fn emit_circuit_open(
     until_ms,
     reason,
   });
+}
+
+async fn run_primary(
+  task: &CheckTask,
+  deps: &TaskDeps,
+  host: &HostState,
+) -> Result<ProbeResponse, NetworkError> {
+  let first = run_probe(&task.prepared.request, deps, task).await?;
+  let Some(two_step) = &task.prepared.two_step else {
+    return Ok(first);
+  };
+  let vars = crate::twostep::extract_vars(&first, &two_step.extractions)
+    .map_err(NetworkError::Http)?;
+  let cookies = if two_step.forward_cookies {
+    crate::twostep::collect_cookies(&first)
+  } else {
+    None
+  };
+  let main =
+    crate::twostep::finalize_main(&two_step.main, &vars, cookies.as_deref())
+      .map_err(NetworkError::Http)?;
+  host.rate_limit().await;
+  run_probe(&main, deps, task).await
 }
 
 async fn run_probe(

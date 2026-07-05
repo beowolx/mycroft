@@ -101,6 +101,33 @@ pub enum ControlMode {
   Strict,
 }
 
+#[derive(
+  Clone,
+  Copy,
+  Debug,
+  Default,
+  PartialEq,
+  Eq,
+  Hash,
+  Serialize,
+  Deserialize,
+  JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum SubjectKind {
+  #[default]
+  Username,
+  Email,
+}
+
+fn default_supports() -> Vec<SubjectKind> {
+  vec![SubjectKind::Username]
+}
+
+fn is_username_only(supports: &[SubjectKind]) -> bool {
+  supports == [SubjectKind::Username]
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 pub struct Site {
   pub id: SiteId,
@@ -108,15 +135,24 @@ pub struct Site {
   pub url_main: String,
   #[serde(default = "default_true")]
   pub enabled: bool,
+  #[serde(
+    default = "default_supports",
+    skip_serializing_if = "is_username_only"
+  )]
+  pub supports: Vec<SubjectKind>,
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
   pub tags: Vec<String>,
   #[serde(default, skip_serializing_if = "is_false")]
   pub nsfw: bool,
+  #[serde(default, skip_serializing_if = "is_false")]
+  pub sends_email: bool,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub risk: Option<RiskInfo>,
   #[serde(default)]
   pub username: UsernameRules,
   pub profile_url_template: String,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub prerequest: Option<Prerequest>,
   #[serde(default)]
   pub request: RequestSpec,
   pub detection: DetectionSpec,
@@ -176,6 +212,39 @@ pub enum UsernameEncoding {
   None,
 }
 
+const fn default_get() -> HttpMethod {
+  HttpMethod::Get
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+pub struct Prerequest {
+  #[serde(default = "default_get")]
+  pub method: HttpMethod,
+  pub url_template: String,
+  #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+  pub headers: BTreeMap<String, String>,
+  #[serde(default = "default_true")]
+  pub forward_cookies: bool,
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
+  pub extract: Vec<Extraction>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+pub struct Extraction {
+  pub name: String,
+  #[serde(flatten)]
+  pub from: ExtractSource,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "source", rename_all = "snake_case")]
+pub enum ExtractSource {
+  Cookie { cookie: String },
+  Header { header: String },
+  JsonPath { path: String },
+  Regex { pattern: String },
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 pub struct RequestSpec {
   pub method: HttpMethod,
@@ -185,6 +254,8 @@ pub struct RequestSpec {
   pub headers: BTreeMap<String, String>,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub body_template: Option<serde_json::Value>,
+  #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+  pub body_form: BTreeMap<String, String>,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub redirect_policy: Option<RedirectPolicy>,
   #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -202,6 +273,7 @@ impl Default for RequestSpec {
       url_template: None,
       headers: BTreeMap::new(),
       body_template: None,
+      body_form: BTreeMap::new(),
       redirect_policy: None,
       timeout_ms: None,
       max_body_bytes: None,
@@ -480,6 +552,11 @@ pub struct KnownControls {
 }
 
 impl Site {
+  #[must_use]
+  pub fn supports_kind(&self, kind: SubjectKind) -> bool {
+    self.supports.contains(&kind)
+  }
+
   #[must_use]
   pub fn probe_template(&self) -> &str {
     self

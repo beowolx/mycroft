@@ -212,6 +212,83 @@
         "uncertain"
       ]
     },
+    "Extraction": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "cookie": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string",
+              "const": "cookie"
+            }
+          },
+          "required": [
+            "source",
+            "cookie"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "header": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string",
+              "const": "header"
+            }
+          },
+          "required": [
+            "source",
+            "header"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string",
+              "const": "json_path"
+            }
+          },
+          "required": [
+            "source",
+            "path"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "pattern": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string",
+              "const": "regex"
+            }
+          },
+          "required": [
+            "source",
+            "pattern"
+          ]
+        }
+      ],
+      "required": [
+        "name"
+      ]
+    },
     "HttpMethod": {
       "type": "string",
       "enum": [
@@ -311,6 +388,37 @@
         "contains_username"
       ]
     },
+    "Prerequest": {
+      "type": "object",
+      "properties": {
+        "extract": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Extraction"
+          }
+        },
+        "forward_cookies": {
+          "type": "boolean",
+          "default": true
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "method": {
+          "$ref": "#/$defs/HttpMethod",
+          "default": "GET"
+        },
+        "url_template": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url_template"
+      ]
+    },
     "RedirectMode": {
       "type": "string",
       "enum": [
@@ -338,6 +446,12 @@
     "RequestSpec": {
       "type": "object",
       "properties": {
+        "body_form": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
         "body_template": true,
         "headers": {
           "type": "object",
@@ -749,6 +863,16 @@
         "nsfw": {
           "type": "boolean"
         },
+        "prerequest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Prerequest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "profile_url_template": {
           "type": "string"
         },
@@ -768,6 +892,15 @@
               "type": "null"
             }
           ]
+        },
+        "sends_email": {
+          "type": "boolean"
+        },
+        "supports": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SubjectKind"
+          }
         },
         "tags": {
           "type": "array",
@@ -847,6 +980,13 @@
           }
         }
       }
+    },
+    "SubjectKind": {
+      "type": "string",
+      "enum": [
+        "username",
+        "email"
+      ]
     },
     "UsernameCase": {
       "type": "string",

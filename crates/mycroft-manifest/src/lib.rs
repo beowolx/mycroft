@@ -12,9 +12,10 @@ pub use load::{
 };
 pub use schema::{
   CURRENT_MANIFEST_VERSION, ControlMode, DetectionSpec, EvidenceOutcome,
-  HttpMethod, Manifest, ManifestDefaults, MatchOp, RedirectMode,
-  RedirectPolicy, RequestSpec, SignalKind, SignalSpec, Site, SiteId,
-  StatusMatch, UsernameEncoding, UsernameRules,
+  ExtractSource, Extraction, HttpMethod, Manifest, ManifestDefaults, MatchOp,
+  Prerequest, RedirectMode, RedirectPolicy, RequestSpec, SignalKind,
+  SignalSpec, Site, SiteId, StatusMatch, SubjectKind, UsernameEncoding,
+  UsernameRules,
 };
 pub use validate::{
   ManifestValidationError, SiteValidationError, validate_manifest,

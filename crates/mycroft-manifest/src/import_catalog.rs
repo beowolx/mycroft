@@ -156,6 +156,7 @@ fn import_entry(name: &str, id: &str, entry: &Value) -> Result<Site, String> {
     url_template: url_probe.map(convert_placeholder),
     headers,
     body_template,
+    body_form: std::collections::BTreeMap::new(),
     redirect_policy,
     timeout_ms: None,
     max_body_bytes: None,
@@ -187,7 +188,9 @@ fn import_entry(name: &str, id: &str, entry: &Value) -> Result<Site, String> {
     name: name.to_string(),
     url_main: url_main.to_string(),
     enabled: true,
+    supports: vec![crate::schema::SubjectKind::Username],
     tags: Vec::new(),
+    sends_email: false,
     nsfw,
     risk: None,
     username: UsernameRules {
@@ -197,6 +200,7 @@ fn import_entry(name: &str, id: &str, entry: &Value) -> Result<Site, String> {
       absent_template: None,
     },
     profile_url_template: convert_placeholder(url),
+    prerequest: None,
     request,
     detection: crate::schema::DetectionSpec {
       min_hit_score: None,

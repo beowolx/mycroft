@@ -4,12 +4,10 @@ use url::Url;
 
 use crate::addr::host_literal_is_disallowed;
 use crate::schema::{
-  BlockSignal, CURRENT_MANIFEST_VERSION, Manifest, MatchOp, RequestSpec,
-  SignalKind, SignalKindSpec, SignalSpec, Site,
+  BlockSignal, CURRENT_MANIFEST_VERSION, ExtractSource, Manifest, MatchOp,
+  RequestSpec, SignalKind, SignalKindSpec, SignalSpec, Site, SubjectKind,
 };
 use crate::template;
-
-const PROBE_USERNAME: &str = "mycroftvalidationuser";
 
 const DENIED_HEADERS: &[&str] =
   &["content-length", "connection", "transfer-encoding"];
@@ -40,6 +38,10 @@ pub enum SiteValidationError {
   InvalidUrlMain(String),
   #[error("profile_url_template is missing the '{{username}}' placeholder")]
   MissingPlaceholder,
+  #[error("site supports email but no template uses an email placeholder")]
+  MissingEmailPlaceholder,
+  #[error("site declares no supported subject kinds")]
+  NoSupportedSubjects,
   #[error("template '{template}' is not a valid URL: {reason}")]
   InvalidTemplate { template: String, reason: String },
   #[error("template '{template}' uses unsupported scheme '{scheme}'")]
@@ -132,9 +134,25 @@ pub fn validate_site(site: &Site) -> Result<(), SiteValidationError> {
   if let Some(probe) = &site.request.url_template {
     validate_template(probe)?;
   }
+  if let Some(pre) = &site.prerequest {
+    validate_template(&pre.url_template)?;
+    for extraction in &pre.extract {
+      if let ExtractSource::Regex { pattern } = &extraction.from {
+        compile_regex(pattern)?;
+      }
+    }
+  }
 
-  if !site_has_placeholder(site) {
+  if site.supports.is_empty() {
+    return Err(SiteValidationError::NoSupportedSubjects);
+  }
+  if site.supports_kind(SubjectKind::Username) && !site_has_placeholder(site) {
     return Err(SiteValidationError::MissingPlaceholder);
+  }
+  if site.supports_kind(SubjectKind::Email)
+    && !site_has_any_email_placeholder(site)
+  {
+    return Err(SiteValidationError::MissingEmailPlaceholder);
   }
 
   validate_request(&site.request)?;
@@ -235,35 +253,43 @@ fn validate_request(request: &RequestSpec) -> Result<(), SiteValidationError> {
 }
 
 fn site_has_placeholder(site: &Site) -> bool {
-  template::has_placeholder(&site.profile_url_template)
-    || site
-      .request
-      .url_template
-      .as_deref()
-      .is_some_and(template::has_placeholder)
-    || site
-      .request
-      .headers
-      .values()
-      .any(|v| template::has_placeholder(v))
+  site_template_matches(site, &template::has_placeholder)
+}
+
+fn site_has_any_email_placeholder(site: &Site) -> bool {
+  site_template_matches(site, &template::has_email_placeholder)
+}
+
+fn site_template_matches(site: &Site, pred: &impl Fn(&str) -> bool) -> bool {
+  pred(&site.profile_url_template)
+    || site.request.url_template.as_deref().is_some_and(pred)
+    || site.request.headers.values().any(|v| pred(v))
+    || site.request.body_form.values().any(|v| pred(v))
     || site
       .request
       .body_template
       .as_ref()
-      .is_some_and(json_has_placeholder)
+      .is_some_and(|b| json_template_matches(b, pred))
 }
 
-fn json_has_placeholder(value: &serde_json::Value) -> bool {
+fn json_template_matches(
+  value: &serde_json::Value,
+  pred: &impl Fn(&str) -> bool,
+) -> bool {
   match value {
-    serde_json::Value::String(s) => template::has_placeholder(s),
-    serde_json::Value::Array(items) => items.iter().any(json_has_placeholder),
-    serde_json::Value::Object(map) => map.values().any(json_has_placeholder),
+    serde_json::Value::String(s) => pred(s),
+    serde_json::Value::Array(items) => {
+      items.iter().any(|v| json_template_matches(v, pred))
+    }
+    serde_json::Value::Object(map) => {
+      map.values().any(|v| json_template_matches(v, pred))
+    }
     _ => false,
   }
 }
 
 fn validate_template(tmpl: &str) -> Result<(), SiteValidationError> {
-  let interpolated = template::interpolate(tmpl, PROBE_USERNAME);
+  let interpolated = template::interpolate_probe(tmpl);
   let url = Url::parse(&interpolated).map_err(|e| {
     SiteValidationError::InvalidTemplate {
       template: tmpl.to_string(),

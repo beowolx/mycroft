@@ -1,10 +1,12 @@
 use std::borrow::Cow;
+use std::fmt::Write as FmtWrite;
 use std::io::{self, Write};
 
 use console::Style;
 use indicatif::ProgressBar;
 
 use mycroft_core::event::ScanEvent;
+use mycroft_core::github::{GithubBatchReport, GithubUserReport};
 use mycroft_core::result::{ScanReport, SiteResult, Verdict};
 
 use crate::args::{FormatArg, PrintArg};
@@ -31,20 +33,27 @@ pub fn make_writer(
   human: HumanOptions,
 ) -> Box<dyn OutputWriter> {
   match format {
-    FormatArg::Human => Box::new(HumanWriter {
-      sink,
-      print: human.print,
-      verbose: human.verbose,
-      quiet: human.quiet,
-      color: human.color,
-      bar: human.bar,
-    }),
+    FormatArg::Human => Box::new(HumanWriter::new(sink, human)),
     FormatArg::Json => Box::new(JsonWriter { sink }),
     FormatArg::Ndjson => Box::new(NdjsonWriter { sink }),
     FormatArg::Csv => Box::new(CsvWriter {
       sink,
       scan_id: String::new(),
     }),
+  }
+}
+
+pub fn write_github_report(
+  format: FormatArg,
+  sink: Sink,
+  human: HumanOptions,
+  report: &GithubBatchReport,
+) -> io::Result<()> {
+  match format {
+    FormatArg::Human => HumanWriter::new(sink, human).finish_github(report),
+    FormatArg::Json => write_json_report(sink, report),
+    FormatArg::Ndjson => write_ndjson_github_report(sink, report),
+    FormatArg::Csv => write_csv_github_report(sink, report),
   }
 }
 
@@ -79,11 +88,23 @@ impl OutputWriter for HumanWriter {
     if self.quiet {
       return Ok(());
     }
-    writeln!(self.sink, "\n{}", self.summary(&report.summary))
+    writeln!(self.sink, "\n{}", self.summary(&report.summary))?;
+    Ok(())
   }
 }
 
 impl HumanWriter {
+  fn new(sink: Sink, human: HumanOptions) -> Self {
+    Self {
+      sink,
+      print: human.print,
+      verbose: human.verbose,
+      quiet: human.quiet,
+      color: human.color,
+      bar: human.bar,
+    }
+  }
+
   fn paint(&self, style: Style, text: &str) -> String {
     style.force_styling(self.color).apply_to(text).to_string()
   }
@@ -162,12 +183,138 @@ impl HumanWriter {
     )
   }
 
+  fn github_report(&self, report: &GithubBatchReport) -> String {
+    let mut out = String::new();
+    for user in &report.users {
+      if !out.is_empty() {
+        out.push('\n');
+      }
+      self.push_github_user(&mut out, user);
+    }
+    out
+  }
+
+  fn finish_github(&mut self, report: &GithubBatchReport) -> io::Result<()> {
+    if self.quiet {
+      return Ok(());
+    }
+    let block = self.github_report(report);
+    if block.is_empty() {
+      return Ok(());
+    }
+    match self.bar.clone() {
+      Some(bar) => bar.suspend(|| writeln!(self.sink, "{block}")),
+      None => writeln!(self.sink, "{block}"),
+    }
+  }
+
+  fn push_github_user(&self, out: &mut String, user: &GithubUserReport) {
+    let _ = writeln!(
+      out,
+      "  {} {}",
+      self.paint(Style::new().bold(), "GitHub"),
+      self.paint(Style::new().cyan(), &user.username),
+    );
+    if let Some(profile) = &user.profile {
+      if let Some(name) = &profile.name {
+        let _ = writeln!(out, "    name: {name}");
+      }
+      if let Some(location) = &profile.location {
+        let _ = writeln!(out, "    location: {location}");
+      }
+      if let Some(bio) = &profile.bio {
+        let _ = writeln!(out, "    bio: {bio}");
+      }
+      if let Some(blog) = &profile.blog {
+        let _ = writeln!(out, "    blog: {blog}");
+      }
+      if let Some(twitter) = &profile.twitter_username {
+        let _ = writeln!(out, "    x/twitter: @{twitter}");
+      }
+    }
+    let repos = &user.repositories;
+    let _ = writeln!(
+      out,
+      "    repos: {} public, {} sources, {} forks, {} archived, {} mirrors, {} templates",
+      repos.total_public,
+      repos.sources,
+      repos.forks,
+      repos.archived,
+      repos.mirrors,
+      repos.templates,
+    );
+    let _ = writeln!(out, "    gists: {}", user.gists);
+    if !user.organizations.is_empty() {
+      let orgs = join_map(&user.organizations, ", ", |org| org.login.clone());
+      let _ = writeln!(out, "    organizations: {orgs}");
+    }
+    if !user.social_accounts.is_empty() {
+      let accounts = join_map(&user.social_accounts, ", ", |account| {
+        format!("{} {}", account.provider, account.url)
+      });
+      let _ = writeln!(out, "    social: {accounts}");
+    }
+    if !user.friends.is_empty() {
+      let friends = join_map(&user.friends, ", ", |friend| {
+        friend.name.as_ref().map_or_else(
+          || friend.login.clone(),
+          |name| {
+            if name == &friend.login {
+              name.clone()
+            } else {
+              format!("{name} ({})", friend.login)
+            }
+          },
+        )
+      });
+      let _ = writeln!(out, "    friends: {friends}");
+    }
+    if !user.similar_users.is_empty() {
+      let similar = join_map(&user.similar_users, ", ", |similar| {
+        similar.name.as_ref().map_or_else(
+          || similar.login.clone(),
+          |name| format!("{name} ({})", similar.login),
+        )
+      });
+      let _ = writeln!(out, "    similar: {similar}");
+    }
+    if !user.commit_emails.is_empty() {
+      let emails = join_map(&user.commit_emails, ", ", |email| {
+        email.name.as_ref().map_or_else(
+          || format!("{} ({})", email.email, email.count),
+          |name| format!("{name} <{}> ({})", email.email, email.count),
+        )
+      });
+      let _ = writeln!(out, "    commit emails: {emails}");
+    }
+    if !user.commit_names.is_empty() {
+      let names = join_map(&user.commit_names, ", ", |name| {
+        format!("{} ({})", name.name, name.count)
+      });
+      let _ = writeln!(out, "    commit names: {names}");
+    }
+    if !user.errors.is_empty() {
+      let errors = join_map(&user.errors, "; ", |error| {
+        format!("{}: {}", error.stage, error.message)
+      });
+      let _ = writeln!(
+        out,
+        "    {} {errors}",
+        self.paint(Style::new().red(), "errors:"),
+      );
+    }
+  }
+
   fn emit(&mut self, line: &str) -> io::Result<()> {
     match self.bar.clone() {
       Some(bar) => bar.suspend(|| writeln!(self.sink, "{line}")),
       None => writeln!(self.sink, "{line}"),
     }
   }
+}
+
+fn join_map<T>(items: &[T], sep: &str, f: impl Fn(&T) -> String) -> String {
+  items.iter().map(f).collect::<Vec<_>>().join(sep)
 }
 
 const fn verdict_glyph(verdict: Verdict) -> &'static str {
@@ -218,14 +365,81 @@ impl OutputWriter for JsonWriter {
   }
 
   fn finish(&mut self, report: &ScanReport) -> io::Result<()> {
-    let json = serde_json::to_string_pretty(report)
-      .map_err(|e| io::Error::other(e.to_string()))?;
-    writeln!(self.sink, "{json}")
+    write_json_report(&mut self.sink, report)
   }
 }
 
 struct NdjsonWriter {
   sink: Sink,
+}
+
+fn write_json_report<T: serde::Serialize>(
+  mut sink: impl Write,
+  report: &T,
+) -> io::Result<()> {
+  let json = serde_json::to_string_pretty(report)
+    .map_err(|e| io::Error::other(e.to_string()))?;
+  writeln!(sink, "{json}")
+}
+
+fn write_ndjson_github_report(
+  mut sink: Sink,
+  report: &GithubBatchReport,
+) -> io::Result<()> {
+  for user in &report.users {
+    let line = serde_json::to_string(user)
+      .map_err(|e| io::Error::other(e.to_string()))?;
+    writeln!(sink, "{line}")?;
+  }
+  sink.flush()
+}
+
+fn write_csv_github_report(
+  mut sink: Sink,
+  report: &GithubBatchReport,
+) -> io::Result<()> {
+  writeln!(
+    sink,
+    "username,profile_name,profile_url,total_public_repos,source_repos,\
+     forks,gists,ssh_keys,friends,similar_users,commit_emails,commit_names,errors"
+  )?;
+  for user in &report.users {
+    let profile_name = user
+      .profile
+      .as_ref()
+      .and_then(|profile| profile.name.clone())
+      .unwrap_or_default();
+    let profile_url = user
+      .profile
+      .as_ref()
+      .and_then(|profile| profile.html_url.clone())
+      .unwrap_or_default();
+    let fields = [
+      user.username.clone(),
+      profile_name,
+      profile_url,
+      user.repositories.total_public.to_string(),
+      user.repositories.sources.to_string(),
+      user.repositories.forks.to_string(),
+      user.gists.to_string(),
+      user.ssh_keys.len().to_string(),
+      user.friends.len().to_string(),
+      user.similar_users.len().to_string(),
+      user.commit_emails.len().to_string(),
+      user.commit_names.len().to_string(),
+      user.errors.len().to_string(),
+    ];
+    writeln!(
+      sink,
+      "{}",
+      fields
+        .iter()
+        .map(|field| csv_escape(field))
+        .collect::<Vec<_>>()
+        .join(",")
+    )?;
+  }
+  sink.flush()
 }
 
 impl OutputWriter for NdjsonWriter {

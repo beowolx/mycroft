@@ -7,8 +7,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Instant;
 
-use time::OffsetDateTime;
-use time::format_description::well_known::Rfc3339;
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
@@ -23,6 +21,7 @@ use crate::planner::{HostKey, ScanPlan};
 use crate::result::{
   RESULT_SCHEMA_VERSION, ScanReport, ScanSummary, SiteResult,
 };
+use crate::util::now_rfc3339;
 
 use host_limiter::HostState;
 use task_runner::{TaskDeps, run_task};
@@ -185,10 +184,4 @@ fn lock_hosts(
     Ok(guard) => guard,
     Err(poisoned) => poisoned.into_inner(),
   }
-}
-
-fn now_rfc3339() -> String {
-  OffsetDateTime::now_utc()
-    .format(&Rfc3339)
-    .unwrap_or_default()
 }

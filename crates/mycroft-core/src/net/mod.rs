@@ -58,11 +58,6 @@ impl ProbeResponse {
   }
 
   #[must_use]
-  pub fn content_type(&self) -> Option<&str> {
-    self.header("content-type")
-  }
-
-  #[must_use]
   pub fn body_text(&self) -> Cow<'_, str> {
     String::from_utf8_lossy(&self.body)
   }

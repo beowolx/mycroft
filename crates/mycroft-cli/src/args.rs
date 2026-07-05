@@ -7,6 +7,15 @@ const ABOUT: &str = "mycroft - accuracy-focused OSINT username checker.
 
 Find usernames across the web and uncover connections with advanced OSINT tooling.";
 
+const EMAIL_ABOUT: &str = "Check whether an email address has an account across \
+email-aware sites.
+
+Probes registration/existence endpoints (e.g. signup validation) that disclose \
+whether an address is already in use. Only sites that declare email support are \
+queried.";
+
+const GITHUB_ABOUT: &str = "Run GitHub enrichment for one or more usernames.";
+
 #[derive(Debug, Parser)]
 #[command(name = "mycroft", version, about = ABOUT)]
 pub struct Cli {
@@ -15,12 +24,16 @@ pub struct Cli {
 }
 
 #[derive(Debug, Subcommand)]
-#[expect(
+#[allow(
   clippy::large_enum_variant,
   reason = "clap derive owns subcommand payloads"
 )]
 pub enum Commands {
   Check(CheckArgs),
+  #[command(about = EMAIL_ABOUT)]
+  Email(CheckArgs),
+  #[command(about = GITHUB_ABOUT)]
+  Github(GithubArgs),
   Sites {
     #[command(subcommand)]
     cmd: SitesCmd,
@@ -105,6 +118,24 @@ pub struct CheckArgs {
 }
 
 #[derive(Debug, Args)]
+pub struct GithubArgs {
+  pub usernames: Vec<String>,
+
+  #[arg(long)]
+  pub usernames_file: Option<PathBuf>,
+  #[arg(long)]
+  pub variant_placeholder: bool,
+  #[command(flatten)]
+  pub network: CheckNetworkArgs,
+  #[command(flatten)]
+  pub output: CheckOutputArgs,
+}
+
+#[allow(
+  clippy::struct_excessive_bools,
+  reason = "clap flag groups naturally contain independent booleans"
+)]
+#[derive(Debug, Args)]
 pub struct CheckInputArgs {
   #[arg(long)]
   pub usernames_file: Option<PathBuf>,
@@ -120,6 +151,8 @@ pub struct CheckInputArgs {
   pub exclude_tags: Vec<String>,
   #[arg(long)]
   pub include_nsfw: bool,
+  #[arg(long)]
+  pub allow_email_sending: bool,
 }
 
 #[derive(Debug, Args)]

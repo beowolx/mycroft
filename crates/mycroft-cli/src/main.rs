@@ -12,16 +12,22 @@ use clap::{CommandFactory, Parser};
 
 use mycroft_core::CancellationToken;
 use mycroft_core::event::EventSender;
+use mycroft_core::github::{GithubError, GithubOptions, enrich_github};
 use mycroft_core::net::FetchSettings;
 use mycroft_core::result::{ScanReport, ScanSummary};
 use mycroft_core::scan::{ScanInput, SiteSelection};
-use mycroft_core::{RuntimeConfig, ScanError, scan_with_events};
+use mycroft_core::{RuntimeConfig, ScanError, SubjectKind, scan_with_events};
 use mycroft_manifest::Manifest;
 
-use crate::args::{CheckArgs, Cli, Commands, FailOnArg, ManifestCmd, SitesCmd};
+use crate::args::{
+  CheckArgs, Cli, Commands, FailOnArg, GithubArgs, ManifestCmd, PrintArg,
+  SitesCmd,
+};
 use crate::config_file::ManifestSource;
 use crate::exit::Exit;
-use crate::output::{HumanOptions, OutputWriter, make_writer};
+use crate::output::{
+  HumanOptions, OutputWriter, make_writer, write_github_report,
+};
 use crate::progress::Progress;
 
 #[tokio::main]
@@ -31,7 +37,9 @@ async fn main() -> ExitCode {
   let cli = Cli::try_parse_from(command_args).unwrap_or_else(|e| e.exit());
 
   let exit = match cli.command {
-    Commands::Check(args) => run_check(args).await,
+    Commands::Check(args) => run_check(args, SubjectKind::Username).await,
+    Commands::Email(args) => run_check(args, SubjectKind::Email).await,
+    Commands::Github(args) => run_github(args).await,
     Commands::Sites { cmd } => run_sites(cmd).await,
     Commands::Manifest { cmd } => run_manifest(cmd),
     Commands::Completions { shell } => {
@@ -53,8 +61,15 @@ fn raise_fd_limit() {
 }
 
 fn inject_default_subcommand(mut argv: Vec<String>) -> Vec<String> {
-  const SUBCOMMANDS: &[&str] =
-    &["check", "sites", "manifest", "completions", "help"];
+  const SUBCOMMANDS: &[&str] = &[
+    "check",
+    "email",
+    "github",
+    "sites",
+    "manifest",
+    "completions",
+    "help",
+  ];
   if argv.len() >= 2 {
     let first = argv[1].as_str();
     let is_help_or_version =
@@ -66,7 +81,7 @@ fn inject_default_subcommand(mut argv: Vec<String>) -> Vec<String> {
   argv
 }
 
-async fn run_check(args: CheckArgs) -> Exit {
+async fn run_check(args: CheckArgs, kind: SubjectKind) -> Exit {
   let file = match config_file::load() {
     Ok(file) => file,
     Err(error) => {
@@ -90,10 +105,10 @@ async fn run_check(args: CheckArgs) -> Exit {
     return Exit::NetworkSetup;
   }
 
-  let usernames = match gather_usernames(&args) {
+  let usernames = match gather_subjects(&args, kind) {
     Ok(names) if !names.is_empty() => names,
     Ok(_) => {
-      eprintln!("error: no usernames provided");
+      eprintln!("error: no {} provided", subject_noun(kind));
       return Exit::Usage;
     }
     Err(exit) => return exit,
@@ -101,6 +116,7 @@ async fn run_check(args: CheckArgs) -> Exit {
 
   let input = ScanInput {
     usernames,
+    subject_kind: kind,
     site_selection: SiteSelection {
       include_sites: args.input.sites.clone(),
       exclude_sites: args.input.exclude_sites.clone(),
@@ -108,7 +124,14 @@ async fn run_check(args: CheckArgs) -> Exit {
       exclude_tags: args.input.exclude_tags.clone(),
     },
     include_nsfw: settings.include_nsfw,
+    include_email_sending: args.input.allow_email_sending,
   };
+
+  if input.include_email_sending {
+    eprintln!(
+      "warning: --allow-email-sending enabled; sites that probe account-recovery endpoints may send a real email or SMS to the address if it is registered"
+    );
+  }
 
   let sink = match open_sink(args.output.output_path.as_ref()) {
     Ok(sink) => sink,
@@ -151,6 +174,79 @@ async fn run_check(args: CheckArgs) -> Exit {
     args.policy.fail_on,
     args.policy.fail_on_partial,
   )
+}
+
+async fn run_github(args: GithubArgs) -> Exit {
+  let file = match config_file::load() {
+    Ok(file) => file,
+    Err(error) => {
+      eprintln!("error: {error}");
+      return Exit::Usage;
+    }
+  };
+  logging::init(args.output.verbose, args.output.quiet);
+
+  let settings = config_file::resolve_github_settings(&args, &file);
+  if settings.runtime.proxy.is_none() && settings.proxy_required {
+    eprintln!("error: --proxy-required set but no proxy was configured");
+    return Exit::NetworkSetup;
+  }
+
+  let usernames = match gather_github_subjects(&args) {
+    Ok(names) if !names.is_empty() => names,
+    Ok(_) => {
+      eprintln!("error: no usernames provided");
+      return Exit::Usage;
+    }
+    Err(exit) => return exit,
+  };
+
+  let sink = match open_sink(args.output.output_path.as_ref()) {
+    Ok(sink) => sink,
+    Err(exit) => return exit,
+  };
+  let progress = Progress::new(settings.progress);
+  let color = args.output.output_path.is_none() && console::colors_enabled();
+  let cancel = CancellationToken::new();
+  spawn_interrupt_handler(cancel.clone());
+
+  let report = match enrich_github(
+    &usernames,
+    &settings.runtime,
+    GithubOptions::default(),
+    cancel,
+  )
+  .await
+  {
+    Ok(report) => report,
+    Err(error) => {
+      eprintln!("error: GitHub enrichment failed: {error}");
+      return github_error_exit(&error);
+    }
+  };
+
+  let human = HumanOptions {
+    print: PrintArg::Found,
+    verbose: args.output.verbose,
+    quiet: args.output.quiet,
+    color,
+    bar: progress.bar(),
+  };
+  if let Err(error) = write_github_report(settings.format, sink, human, &report)
+  {
+    eprintln!("error: failed to write output: {error}");
+    return Exit::Io;
+  }
+
+  Exit::Ok
+}
+
+const fn github_error_exit(error: &GithubError) -> Exit {
+  match error {
+    GithubError::InvalidBaseUrl(_) => Exit::Usage,
+    GithubError::NetworkConfig(_) => Exit::NetworkSetup,
+    GithubError::Interrupted => Exit::Interrupted,
+  }
 }
 
 async fn execute_scan(
@@ -226,11 +322,19 @@ const fn compute_exit(
   Exit::Ok
 }
 
-fn gather_usernames(
-  args: &CheckArgs,
-) -> Result<Vec<mycroft_core::Username>, Exit> {
-  let mut raw: Vec<String> = args.usernames.clone();
-  if let Some(path) = &args.input.usernames_file {
+const fn subject_noun(kind: SubjectKind) -> &'static str {
+  match kind {
+    SubjectKind::Username => "usernames",
+    SubjectKind::Email => "email addresses",
+  }
+}
+
+fn read_raw_subjects(
+  explicit: &[String],
+  usernames_file: Option<&PathBuf>,
+) -> Result<Vec<String>, Exit> {
+  let mut raw: Vec<String> = explicit.to_vec();
+  if let Some(path) = usernames_file {
     let contents = std::fs::read_to_string(path).map_err(|e| {
       eprintln!("error: failed to read {}: {e}", path.display());
       Exit::Io
@@ -242,13 +346,37 @@ fn gather_usernames(
       }
     }
   }
+  Ok(raw)
+}
 
+fn gather_subjects(
+  args: &CheckArgs,
+  kind: SubjectKind,
+) -> Result<Vec<mycroft_core::Username>, Exit> {
+  let raw =
+    read_raw_subjects(&args.usernames, args.input.usernames_file.as_ref())?;
+  match kind {
+    SubjectKind::Username => {
+      gather_usernames(&raw, args.input.variant_placeholder)
+    }
+    SubjectKind::Email => gather_emails(&raw),
+  }
+}
+
+fn gather_github_subjects(
+  args: &GithubArgs,
+) -> Result<Vec<mycroft_core::Username>, Exit> {
+  let raw = read_raw_subjects(&args.usernames, args.usernames_file.as_ref())?;
+  gather_usernames(&raw, args.variant_placeholder)
+}
+
+fn gather_usernames(
+  raw: &[String],
+  variant_placeholder: bool,
+) -> Result<Vec<mycroft_core::Username>, Exit> {
   let mut usernames = Vec::new();
   for value in raw {
-    match mycroft_core::username::expand_variants(
-      &value,
-      args.input.variant_placeholder,
-    ) {
+    match mycroft_core::username::expand_variants(value, variant_placeholder) {
       Ok(expanded) => usernames.extend(expanded),
       Err(e) => {
         eprintln!("error: invalid username '{value}': {e}");
@@ -257,6 +385,22 @@ fn gather_usernames(
     }
   }
   Ok(usernames)
+}
+
+fn gather_emails(raw: &[String]) -> Result<Vec<mycroft_core::Username>, Exit> {
+  let mut emails = Vec::new();
+  for value in raw {
+    let email = mycroft_core::Email::parse(value).map_err(|e| {
+      eprintln!("error: invalid email '{value}': {e}");
+      Exit::Usage
+    })?;
+    let subject = mycroft_core::Username::parse(email.as_str()).map_err(|e| {
+      eprintln!("error: invalid email '{value}': {e}");
+      Exit::Usage
+    })?;
+    emails.push(subject);
+  }
+  Ok(emails)
 }
 
 fn open_sink(path: Option<&PathBuf>) -> Result<output::Sink, Exit> {

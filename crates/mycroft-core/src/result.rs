@@ -11,14 +11,9 @@ impl ScanId {
   #[must_use]
   pub fn random() -> Self {
     use rand::Rng;
-    use std::fmt::Write;
     let mut bytes = [0u8; 16];
     rand::rng().fill_bytes(&mut bytes);
-    let mut hex = String::with_capacity(32);
-    for byte in bytes {
-      let _ = write!(hex, "{byte:02x}");
-    }
-    Self(hex)
+    Self(crate::util::hex(&bytes))
   }
 }
 
